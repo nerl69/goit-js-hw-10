@@ -1,94 +1,75 @@
-import './css/styles.css';
+import { fetchBreeds, fetchCatByBreed } from "./cat-api";
+import './styles.css';
 import { Notify } from 'notiflix/build/notiflix-notify-aio';
-import debounce from 'lodash.debounce';
-import { fetchCountries } from './js/fetchCountries';
+import SlimSelect from 'slim-select'
+import 'slim-select/dist/slimselect.css';
 
-const DEBOUNCE_DELAY = 300;
-const countriesList = document.querySelector('.country-list');
-const countryInfo = document.querySelector('.country-info');
-const searchBox = document.querySelector('#search-box');
-const body = document.querySelector('body');
-body.style.backgroundImage =
-  'radial-gradient( circle 610px at 5.2% 51.6%,  rgba(5,8,114,1) 0%, rgba(7,3,53,1) 97.5% )';
-countriesList.style.visibility = 'hidden';
-countryInfo.style.visibility = 'hidden';
-searchBox.addEventListener('input', debounce(onInputSearch, DEBOUNCE_DELAY));
+const ref = {
+    selector: document.querySelector('.breed-select'),
+    divCatInfo: document.querySelector('.cat-info'),
+    loader: document.querySelector('.loader'),
+    error: document.querySelector('.error'),
+};
+const { selector, divCatInfo, loader, error } = ref;
 
-function onInputSearch(e) {
-  const value = searchBox.value.trim();
-  console.log(value);
+loader.classList.replace('loader', 'is-hidden');
+error.classList.add('is-hidden');
+divCatInfo.classList.add('is-hidden');
 
-  if (!value) {
-    addHidden();
-    clearInterfaceUI();
-    return;
-  }
-
-  fetchCountries(value)
-    .then(data => {
-      if (data.length > 10) {
-        Notify.info(
-          'Too many matches found. Please enter a more specific name.'
-        );
-      }
-      renderCountries(data);
-    })
-    .catch(err => {
-      clearInterfaceUI();
-      Notify.failure('Oops, there is no country with that name');
+let arrBreedsId = [];
+fetchBreeds()
+.then(data => {
+    data.forEach(element => {
+        arrBreedsId.push({text: element.name, value: element.id});
     });
-}
+    new SlimSelect({
+        select: selector,
+        data: arrBreedsId
+    });
+    })
+.catch(onFetchError);
 
-const generateMarkupCountryInfo = data =>
-  data.reduce(
-    (acc, { flags: { svg }, name, capital, population, languages }) => {
-      console.log(languages);
-      languages = Object.values(languages).join(', ');
-      console.log(name);
-      return (
-        acc +
-        ` <img src="${svg}" alt="${name}" width="320" height="auto">
-            <p> ${name.official}</p>
-            <p>Capital: <span> ${capital}</span></p>
-            <p>Population: <span> ${population}</span></p>
-            <p>Languages: <span> ${languages}</span></p>`
-      );
-    },
-    ''
-  );
+selector.addEventListener('change', onSelectBreed);
 
-const generateMarkupCountryList = data =>
-  data.reduce((acc, { name: { official, common }, flags: { svg } }) => {
-    return (
-      acc +
-      `<li>
-        <img src="${svg}" alt="${common}" width="70">
-        <span>${official}</span>
-      </li>`
-    );
-  }, '');
+function onSelectBreed(event) {
+    loader.classList.replace('is-hidden', 'loader');
+    selector.classList.add('is-hidden');
+    divCatInfo.classList.add('is-hidden');
 
-function renderCountries(result) {
-  if (result.length === 1) {
-    countriesList.innerHTML = '';
-    countriesList.style.visibility = 'hidden';
-    countryInfo.style.visibility = 'visible';
-    countryInfo.innerHTML = generateMarkupCountryInfo(result);
-  }
-  if (result.length >= 2 && result.length <= 10) {
-    countryInfo.innerHTML = '';
-    countryInfo.style.visibility = 'hidden';
-    countriesList.style.visibility = 'visible';
-    countriesList.innerHTML = generateMarkupCountryList(result);
-  }
-}
+    const breedId = event.currentTarget.value;
+    fetchCatByBreed(breedId)
+    .then(data => {
+        loader.classList.replace('loader', 'is-hidden');
+        selector.classList.remove('is-hidden');
+        const { url, breeds } = data[0];
+        
+        divCatInfo.innerHTML = `<div class="box-img"><img src="${url}" alt="${breeds[0].name}" width="400"/></div><div class="box"><h1>${breeds[0].name}</h1><p>${breeds[0].description}</p><p><b>Temperament:</b> ${breeds[0].temperament}</p></div>`
+        divCatInfo.classList.remove('is-hidden');
+    })
+    .catch(onFetchError);
+};
 
-function clearInterfaceUI() {
-  countriesList.innerHTML = '';
-  countryInfo.innerHTML = '';
-}
+function onFetchError(error) {
+    selector.classList.remove('is-hidden');
+    loader.classList.replace('loader', 'is-hidden');
 
-function addHidden() {
-  countriesList.style.visibility = 'hidden';
-  countryInfo.style.visibility = 'hidden';
-}
+    Notify.failure('Oops! Something went wrong! Try reloading the page or select another cat breed!', {
+        position: 'center-center',
+        timeout: 5000,
+        width: '400px',
+        fontSize: '24px'
+    });
+};
+   
+
+
+
+
+
+
+    
+
+
+
+
+
